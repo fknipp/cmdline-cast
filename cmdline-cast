@@ -1,0 +1,90 @@
+#/bin/bash
+#
+# This is the CLI component to login to the cmdline-server and to start a new
+# session
+
+SERVER="http://192.168.27.159:3000"
+AUTHORIZATION_FILE="$HOME/.cmdline-cast-token"
+
+get_key_from_json() {
+
+  python3 -c "
+import sys; import json;
+data = json.load(sys.stdin)
+if '$1' in data:
+  print(data['$1'])
+else:
+  sys.exit(1)
+"
+}
+
+login() {
+  echo "Logging in on $SERVER"
+  read -p "Enter your e-mail address: " -e -i "$2" email
+  read -p "Enter your password: " -s password
+
+  password="testtest"
+
+  echo "Logging in $email"
+
+  TEMPFILE=$(mktemp)
+  curl -X POST "$SERVER/users/login" -d "email=$email" -d "password=$password" -s > $tempfile
+
+  CMDLINE_CAST_TOKEN=$(get_key_from_json token < $tempfile)
+
+  if [ $? -eq 0 ] ; then 
+    echo "Login successful"
+    echo "$TOKEN" > $AUTHORIZATION_FILE
+  else
+    echo -n "Login failed with reason: "
+    get_key_from_json reason < $tempfile
+  fi
+  
+  rm $tempfile
+}
+
+start_session() {
+  if [ ! "$CMDLINE_CAST_SESSIONID" ]; then
+    while [ ! -e $AUTHORIZATION_FILE ] ; do 
+      login "$@"
+    done
+
+    CMDLINE_CAST_TOKEN=$(cat $AUTHORIZATION_FILE)
+    
+    tempfile=$(mktemp)
+    curl -X POST "$SERVER/methods/sessions.insert" -d "hostname=$HOSTNAME" -d "ip=0.0.0.0" -H "Authorization: Bearer $CMDLINE_CAST_TOKEN" -s > $tempfile
+
+    export CMDLINE_CAST_SESSIONID="$(cat $tempfile | sed 's/"//g')"
+    export CMDLINE_CAST_TOKEN="$CMDLINE_CAST_TOKEN"
+
+    rm $tempfile
+  fi
+
+  export PS0='$(/usr/local/bin/cmdline-cast log)'
+
+  echo "CMDLINE_CAST_SESSIONID=$CMDLINE_CAST_SESSIONID"
+  echo "CMDLINE_CAST_TOKEN=$TOKEN"
+  echo "PS0='$PS0'"
+}
+
+log_command() {
+  if [ ! "$CMDLINE_CAST_SESSIONID" ]; then
+    tput smso
+    echo cmdline-cast session not found.
+    tput rmso
+    exit 2
+  fi
+
+  wd=$(pwd)
+  command=${2:-$(history 1 | cut -b8-)}
+
+  curl -X POST "$SERVER/methods/sessions.addCommand" -d "sessionId=$CMDLINE_CAST_SESSIONID" -d "user=$USER" -d "directory=$wd" -d "command=$command" -H "Authorization: Bearer $CMDLINE_CAST_TOKEN" -s > /dev/null
+}
+
+if [ "$1" = "login" ]; then
+  login "$@"
+elif [ "$1" = "start" ]; then
+  start_session "$@"
+elif [ "$1" = "log" ]; then
+  log_command "$@"
+fi
