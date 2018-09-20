@@ -89,6 +89,16 @@ log_command() {
     --data-urlencode "command=$command" \
     -H "Authorization: Bearer $CMDLINE_CAST_TOKEN" -s > /dev/null
 }
+
+stop_session() {
+  unset PS0
+  unset CMDLINE_CAST_SESSIONID
+  unset CMDLINE_CAST_TOKEN
+}
+
+logout_user() {
+  stop_session
+  rm -r $AUTHORIZATION_FILE > /dev/null
 }
 
 if [ "$1" = "login" ]; then
@@ -97,4 +107,8 @@ elif [ "$1" = "start" ]; then
   start_session "$@"
 elif [ "$1" = "log" ]; then
   log_command "$@"
+elif [ "$1" = "stop" ]; then
+  stop_session "$@"
+elif [ "$1" = "logout" ]; then
+  logout_user "$@"
 fi
