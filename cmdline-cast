@@ -27,7 +27,9 @@ login() {
   echo "Logging in $email"
 
   tempfile=$(mktemp)
-  curl -X POST "$SERVER/users/login" -d "email=$email" -d "password=$password" -s > $tempfile
+  curl -X POST "$SERVER/users/login" \
+    --data-urlencode "email=$email" \
+    --data-urlencode "password=$password" -s > $tempfile
 
   CMDLINE_CAST_TOKEN=$(get_key_from_json token < $tempfile)
 
@@ -51,7 +53,10 @@ start_session() {
     CMDLINE_CAST_TOKEN="$(cat $AUTHORIZATION_FILE)"
     
     tempfile=$(mktemp)
-    curl -X POST "$SERVER/methods/sessions.insert" -d "hostname=$HOSTNAME" -d "ip=0.0.0.0" -H "Authorization: Bearer $CMDLINE_CAST_TOKEN" -s > $tempfile
+    curl -X POST "$SERVER/methods/sessions.insert" \
+      --data-urlencode "hostname=$HOSTNAME" \
+      --data-urlencode "ip=0.0.0.0" \
+      -H "Authorization: Bearer $CMDLINE_CAST_TOKEN" -s > $tempfile
 
     export CMDLINE_CAST_SESSIONID="$(cat $tempfile | sed 's/"//g')"
     export CMDLINE_CAST_TOKEN="$CMDLINE_CAST_TOKEN"
@@ -77,7 +82,13 @@ log_command() {
   wd=$(pwd)
   command=${2:-$(history 1 | cut -b8-)}
 
-  curl -X POST "$SERVER/methods/sessions.addCommand" -d "sessionId=$CMDLINE_CAST_SESSIONID" -d "user=$USER" -d "directory=$wd" -d "command=$command" -H "Authorization: Bearer $CMDLINE_CAST_TOKEN" -s > /dev/null
+  curl -X POST "$SERVER/methods/sessions.addCommand" \
+    --data-urlencode "sessionId=$CMDLINE_CAST_SESSIONID" \
+    --data-urlencode "user=$USER" \
+    --data-urlencode "directory=$wd" \
+    --data-urlencode "command=$command" \
+    -H "Authorization: Bearer $CMDLINE_CAST_TOKEN" -s > /dev/null
+}
 }
 
 if [ "$1" = "login" ]; then
